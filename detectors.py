@@ -1,25 +1,39 @@
-import pandas as pd
-import numpy as np
 from scipy.stats import mannwhitneyu, ks_2samp
 
 
 class BaseDetector:
     def compare_two_numerical_distributions(
-        self,
-        x1: np.ndarray,
-        x2: np.ndarray,
-        test: str = "mw",
-        significance: float = 0.05,
+        self, baseline, new, test="mw", significance=0.05,
     ):
         self._validate_test_name(test)
         test_dict = dict(mw=mannwhitneyu, ks=ks_2samp)
-        statistic, p_value = test_dict[test](x1, x2, alternative="two_sided")
+        statistic, p_value = test_dict[test](baseline, new, alternative="two_sided")
         return p_value < significance
 
     @staticmethod
     def _validate_test_name(test):
         if test not in ["mw", "ks"]:
             raise ValueError("Not a valid test name")
+
+    @staticmethod
+    def _test_new_categories(baseline, new):
+        return len([cat for cat in new if cat not in baseline])
+
+    @staticmethod
+    def _test_deprecated_categories(baseline, new):
+        return len([cat for cat in baseline if cat not in new])
+
+    @staticmethod
+    def _create_frequency_arrays(baseline, new):
+        """
+        This method creates frequency arrays from the original arrays, i.e. arrays with the frequency of each category.
+        The order of the categories is preserved between baseline and old. Categories in the new distribution that don't
+        exist in the baseline and vice versa should be ignored (a different evaluation is made for that purpose)
+        :param baseline:
+        :param new:
+        :return:
+        """
+        pass
 
 
 class TimeBasedDetector(BaseDetector):
