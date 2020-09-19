@@ -17,11 +17,11 @@ class BaseDetector:
 
     @staticmethod
     def _test_new_categories(baseline, new):
-        return len([cat for cat in new if cat not in baseline])
+        return [cat for cat in new if cat not in baseline]
 
     @staticmethod
     def _test_deprecated_categories(baseline, new):
-        return len([cat for cat in baseline if cat not in new])
+        return [cat for cat in baseline if cat not in new]
 
     @staticmethod
     def _create_frequency_arrays(baseline, new):
