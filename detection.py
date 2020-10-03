@@ -69,3 +69,18 @@ class DistributionDrift:
         :return: arrays with frequencies for both original and new distributions
         :rtype: tuple of array-like objects
         """
+
+    def detect_drift(self, baseline, new, numerical_test="mw"):
+        """
+        This uses all the methods above to decide if there is a drift between baseline and new. First, it should check
+        that either both arrays are categorical or both numerical. It also has to consider what happens with missing
+        values. Then there is a case if both are numerical and another case if both are categorical (the function should
+        detect the types, or call a function that does this).
+        :param baseline:
+        :type baseline: array-like
+        :param new:
+        :type new: array-like
+        :param numerical_test:
+        :return: Whether there is drift or not
+        :rtype: bool
+        """
