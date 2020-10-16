@@ -1,4 +1,5 @@
 from scipy.stats import mannwhitneyu, ks_2samp, chisquare
+from collections import Counter
 
 
 class DistributionDrift:
@@ -69,6 +70,14 @@ class DistributionDrift:
         :return: arrays with frequencies for both original and new distributions
         :rtype: tuple of array-like objects
         """
+
+        base_cat_freq = {key: freq for key, freq in Counter(baseline).items() if key in new}
+        new_cat_freq = {key: Counter(new)[key] for key in base_cat_freq.keys()}
+
+        base_freq = list(base_cat_freq.values())
+        new_freq = list(new_cat_freq.values())
+
+        return base_freq, new_freq
 
     def detect_drift(self, baseline, new, numerical_test="mw"):
         """
