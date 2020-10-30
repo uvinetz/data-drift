@@ -88,6 +88,13 @@ class DistributionDrift:
         numerical_test: Optional[str] = "mw",
         is_categorical: Optional[bool] = False,
     ) -> bool:
+        """
+        :param baseline: Baseline (old period / train set) vector
+        :param new: Target (future period / test set) vector
+        :param numerical_test: Which statistical test to use if the variable is numerical
+        :param is_categorical: Whether the variable is categorical or not.
+        :return: True if a drift was detected between baseline and new.
+        """
         if is_categorical:
             return self._compare_two_categorical_distributions(baseline, new)
         return self._compare_two_numerical_distributions(
