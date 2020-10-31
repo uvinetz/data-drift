@@ -60,8 +60,8 @@ class DistributionDrift:
     ) -> list:
         return [cat for cat in baseline if cat not in new]
 
-    @staticmethod
     def _create_frequency_arrays(
+        self,
         baseline: Union[list, np.ndarray, pd.Series],
         new: Union[list, np.ndarray, pd.Series],
     ) -> Tuple[List[int], List[int]]:
@@ -75,6 +75,8 @@ class DistributionDrift:
         new_cat_freq = OrderedDict(
             {key: Counter(new)[key] for key in base_cat_freq.keys()}
         )
+
+        base_cat_freq, new_cat_freq = self._remove_missing_values(baseline, new, base_cat_freq, new_cat_freq)
 
         base_freq = list(base_cat_freq.values())
         new_freq = list(new_cat_freq.values())
@@ -100,3 +102,44 @@ class DistributionDrift:
         return self._compare_two_numerical_distributions(
             baseline, new, test=numerical_test
         )
+
+    def _remove_missing_values(
+        self,
+        baseline: Union[list, np.ndarray, pd.Series],
+        new: Union[list, np.ndarray, pd.Series],
+        base_cat_freq: OrderedDict,
+        new_cat_freq: OrderedDict
+    ) -> Tuple[OrderedDict, OrderedDict]:
+        """
+        This method gets the missing values frequencies from the original arrays and compares missing values frequencies
+        :param baseline: Baseline (old period / train set) vector
+        :param new: Target (future period / test set) vector
+        :param base_cat_freq: Baseline vector value counts with missing values
+        :param new_cat_freq: Target vector value counts with missing values
+        :type base_cat_freq: object without missing values
+        :type new_cat_freq: object without missing values
+        """
+        # Take missing values from the dictionaries
+        if None in baseline and np.nan in baseline:
+            base_missing_prop = (base_cat_freq.pop(None) + base_cat_freq.pop(np.nan)) / len(baseline)
+        elif None in baseline:
+            base_missing_prop = base_cat_freq.pop(None) / len(baseline)
+        elif np.nan in baseline:
+            base_missing_prop = base_cat_freq.pop(np.nan) / len(baseline)
+        else:
+            base_missing_prop = 0
+
+        if None in new and np.nan in new:
+            new_missing_prop = (new_cat_freq.pop(None) + new_cat_freq.pop(np.nan)) / len(new)
+        elif None in new:
+            new_missing_prop = new_cat_freq.pop(None) / len(new)
+        elif np.nan in new:
+            new_missing_prop = new_cat_freq.pop(np.nan) / len(new)
+        else:
+            new_missing_prop = 0
+
+        # Validate missing values proportions
+        if base_missing_prop > self.significance or new_missing_prop > self.significance:
+            raise ValueError("Too many missing values")
+
+        return base_cat_freq, new_cat_freq
