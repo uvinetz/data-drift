@@ -28,7 +28,7 @@ class DistributionDrift:
         """
         self._validate_test_name(test)
         test_dict = dict(mw=mannwhitneyu, ks=ks_2samp)
-        statistic, p_value = test_dict[test](baseline, new, alternative="two_sided")
+        statistic, p_value = test_dict[test](baseline, new, alternative="two-sided")
         return p_value < self._significance
 
     def _compare_two_categorical_distributions(
