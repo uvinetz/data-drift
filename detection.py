@@ -116,30 +116,27 @@ class DistributionDrift:
         :param new: Target (future period / test set) vector
         :param base_cat_freq: Baseline vector value counts with missing values
         :param new_cat_freq: Target vector value counts with missing values
-        :type base_cat_freq: object without missing values
-        :type new_cat_freq: object without missing values
         """
-        # Take missing values from the dictionaries
-        if None in baseline and np.nan in baseline:
-            base_missing_prop = (base_cat_freq.pop(None) + base_cat_freq.pop(np.nan)) / len(baseline)
-        elif None in baseline:
-            base_missing_prop = base_cat_freq.pop(None) / len(baseline)
-        elif np.nan in baseline:
-            base_missing_prop = base_cat_freq.pop(np.nan) / len(baseline)
-        else:
-            base_missing_prop = 0
+        # Transform inputs into pandas series
+        baseline = pd.Series(baseline)
+        new = pd.Series(new)
 
-        if None in new and np.nan in new:
-            new_missing_prop = (new_cat_freq.pop(None) + new_cat_freq.pop(np.nan)) / len(new)
-        elif None in new:
-            new_missing_prop = new_cat_freq.pop(None) / len(new)
-        elif np.nan in new:
-            new_missing_prop = new_cat_freq.pop(np.nan) / len(new)
-        else:
-            new_missing_prop = 0
+        # Calculate proportions of missing values
+        base_missing_prop = baseline.isna().mean()
+        new_missing_prop = new.isna().mean()
 
         # Validate missing values proportions
-        if base_missing_prop > self.significance or new_missing_prop > self.significance:
+        if base_missing_prop != 0 and new_missing_prop != 0 and \
+                (new_missing_prop > base_missing_prop * (1 + self.significance) or
+                 base_missing_prop > new_missing_prop * (1 + self.significance)):
             raise ValueError("Too many missing values")
+        elif base_missing_prop == 0 and new_missing_prop > self.significance:
+            raise ValueError("Too many missing values")
+        elif new_missing_prop == 0 and base_missing_prop > self.significance:
+            raise ValueError("Too many missing values")
+
+        # Remove the missing values
+        base_cat_freq = OrderedDict({key: value for key, value in base_cat_freq.items() if key})
+        new_cat_freq = OrderedDict({key: value for key, value in new_cat_freq.items() if key})
 
         return base_cat_freq, new_cat_freq
