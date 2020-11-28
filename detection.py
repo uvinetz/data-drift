@@ -1,17 +1,21 @@
 from collections import Counter, OrderedDict
-from typing import Union, Tuple, Optional, List
+from typing import Union, Tuple, Optional, List, Any
+from datetime import datetime as dt
 
 from scipy.stats import mannwhitneyu, ks_2samp, chisquare
 import numpy as np
 import pandas as pd
+
+from selection import TimeBasedSelector
 
 
 class DistributionDrift:
     def __init__(self, significance: float = 0.05):
         """
         Class used for detecting data drift based on distribution evaluations
+        :param significance: Statistical significance required in the different tests to flag drift
         """
-        self.significance = significance
+        self._significance = significance
 
     def _compare_two_numerical_distributions(
         self,
@@ -24,8 +28,8 @@ class DistributionDrift:
         """
         self._validate_test_name(test)
         test_dict = dict(mw=mannwhitneyu, ks=ks_2samp)
-        statistic, p_value = test_dict[test](baseline, new, alternative="two_sided")
-        return p_value < self.significance
+        statistic, p_value = test_dict[test](baseline, new, alternative="two-sided")
+        return p_value < self._significance
 
     def _compare_two_categorical_distributions(
         self,
@@ -39,7 +43,7 @@ class DistributionDrift:
         new = [cat for cat in new if cat in baseline]
         base_freq, new_freq = self._create_frequency_arrays(baseline, new)
         statistic, p_value = chisquare(new_freq, base_freq)
-        return p_value < self.significance
+        return p_value < self._significance
 
     @staticmethod
     def _validate_test_name(test: str):
@@ -47,14 +51,14 @@ class DistributionDrift:
             raise ValueError("Not a valid test name")
 
     @staticmethod
-    def test_new_categories(
+    def _test_new_categories(
         baseline: Union[list, np.ndarray, pd.Series],
         new: Union[list, np.ndarray, pd.Series],
     ) -> list:
         return [cat for cat in new if cat not in baseline]
 
     @staticmethod
-    def test_deprecated_categories(
+    def _test_deprecated_categories(
         baseline: Union[list, np.ndarray, pd.Series],
         new: Union[list, np.ndarray, pd.Series],
     ) -> list:
@@ -83,7 +87,7 @@ class DistributionDrift:
 
         return base_freq, new_freq
 
-    def detect_drift(
+    def detect_single_drift(
         self,
         baseline: Union[list, np.ndarray, pd.Series],
         new: Union[list, np.ndarray, pd.Series],
@@ -102,6 +106,30 @@ class DistributionDrift:
         return self._compare_two_numerical_distributions(
             baseline, new, test=numerical_test
         )
+
+    def detect_drift(
+        self,
+        df: pd.DataFrame,
+        feature_names: Union[Any, List[Any]],
+        splitting_column_name: Any,
+        time_cutoffs: List[dt],
+        categorical_columns: Optional[List[str]] = None,
+        numerical_test: Optional[str] = "mw",
+    ):
+        selector = TimeBasedSelector(time_cutoffs, feature_names, splitting_column_name)
+        list_of_splits = selector.split_dataframe(df)
+        for ix, split in enumerate(list_of_splits):
+            for feature in feature_names:
+                baseline, new = split[0][feature], split[1][feature]
+                if self.detect_single_drift(
+                    baseline,
+                    new,
+                    numerical_test,
+                    is_categorical=(feature in categorical_columns),
+                ):
+                    print(
+                        f"Drift detected in feature {feature} before and after {time_cutoffs[ix]}"
+                    )
 
     def _remove_missing_values(
         self,
@@ -127,12 +155,12 @@ class DistributionDrift:
 
         # Validate missing values proportions
         if base_missing_prop != 0 and new_missing_prop != 0 and \
-                (new_missing_prop > base_missing_prop * (1 + self.significance) or
-                 base_missing_prop > new_missing_prop * (1 + self.significance)):
+                (new_missing_prop > base_missing_prop * (1 + self._significance) or
+                 base_missing_prop > new_missing_prop * (1 + self._significance)):
             raise ValueError("Too many missing values")
-        elif base_missing_prop == 0 and new_missing_prop > self.significance:
+        elif base_missing_prop == 0 and new_missing_prop > self._significance:
             raise ValueError("Too many missing values")
-        elif new_missing_prop == 0 and base_missing_prop > self.significance:
+        elif new_missing_prop == 0 and base_missing_prop > self._significance:
             raise ValueError("Too many missing values")
 
         # Remove the missing values
