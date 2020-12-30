@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 from selection import TimeBasedSelector
+from detection import DistributionDrift
 
 np.random.seed(99)
 
@@ -64,3 +65,40 @@ def test_cutoffs():
     )
     splits = splitter.split_dataframe(df)
     assert len(splits) == 3, "Bad number of splits"
+
+
+@pytest.mark.numerical
+def test_numerical_detection():
+    df = generate_synthetic_data()
+    detector = DistributionDrift()
+    detector.detect_drift(
+        df,
+        ["numerical"],
+        "date",
+        [
+            dt.strptime("2018-01-01", "%Y-%m-%d"),
+            dt.strptime("2019-01-01", "%Y-%m-%d"),
+            dt.strptime("2020-01-01", "%Y-%m-%d"),
+            dt.strptime("2021-01-01", "%Y-%m-%d"),
+        ],
+    )
+    assert detector.drift_alerts_count == 2, "Wrong number of alerts"
+
+
+@pytest.mark.categorical
+def test_categorical_detection():
+    df = generate_synthetic_data()
+    detector = DistributionDrift()
+    detector.detect_drift(
+        df,
+        ["categorical"],
+        "date",
+        [
+            dt.strptime("2018-01-01", "%Y-%m-%d"),
+            dt.strptime("2019-01-01", "%Y-%m-%d"),
+            dt.strptime("2020-01-01", "%Y-%m-%d"),
+            dt.strptime("2021-01-01", "%Y-%m-%d"),
+        ],
+        categorical_columns=["categorical"],
+    )
+    assert detector.drift_alerts_count == 2, "Wrong number of alerts"

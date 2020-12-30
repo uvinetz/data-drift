@@ -1,5 +1,5 @@
 from collections import Counter, OrderedDict
-from typing import Union, Tuple, Optional, List, Any
+from typing import Union, Tuple, Optional, List, Any, Dict
 from datetime import datetime as dt
 
 from scipy.stats import mannwhitneyu, ks_2samp, power_divergence
@@ -15,13 +15,15 @@ class DistributionDrift:
         Class used for detecting data drift based on distribution evaluations
         :param significance: Statistical significance required in the different tests to flag drift
         """
-        self._significance = significance
+        self._significance: float = significance
+        self.drift_alerts: List[Dict[str, str]] = list()
+        self.drift_alerts_count: int = 0
 
     def _compare_two_numerical_distributions(
         self,
         baseline: Union[list, np.ndarray, pd.Series],
         new: Union[list, np.ndarray, pd.Series],
-        test: Optional[str] = "mw",
+        test: Optional[str] = "ks",
     ) -> bool:
         """
         Compares two numerical distributions based on the selected test
@@ -102,18 +104,22 @@ class DistributionDrift:
         self,
         baseline: Union[list, np.ndarray, pd.Series],
         new: Union[list, np.ndarray, pd.Series],
-        numerical_test: Optional[str] = "mw",
+        numerical_test: Optional[str] = "ks",
         is_categorical: Optional[bool] = False,
+        categorical_test: Optional[str] = "pearson",
     ) -> bool:
         """
         :param baseline: Baseline (old period / train set) vector
         :param new: Target (future period / test set) vector
         :param numerical_test: Which statistical test to use if the variable is numerical
         :param is_categorical: Whether the variable is categorical or not.
+        :param categorical_test: Which statistical test to use if the variable is categorical
         :return: True if a drift was detected between baseline and new.
         """
         if is_categorical:
-            return self._compare_two_categorical_distributions(baseline, new)
+            return self._compare_two_categorical_distributions(
+                baseline, new, categorical_test
+            )
         return self._compare_two_numerical_distributions(
             baseline, new, test=numerical_test
         )
@@ -125,7 +131,8 @@ class DistributionDrift:
         splitting_column_name: Any,
         time_cutoffs: List[dt],
         categorical_columns: Optional[List[str]] = None,
-        numerical_test: Optional[str] = "mw",
+        numerical_test: Optional[str] = "ks",
+        categorical_test: Optional[str] = "pearson",
     ):
         selector = TimeBasedSelector(time_cutoffs, feature_names, splitting_column_name)
         list_of_splits = selector.split_dataframe(df)
@@ -137,7 +144,12 @@ class DistributionDrift:
                     new,
                     numerical_test,
                     is_categorical=(feature in categorical_columns),
+                    categorical_test=categorical_test,
                 ):
                     print(
                         f"Drift detected in feature {feature} before and after {time_cutoffs[ix]}"
                     )
+                    self.drift_alerts.append(
+                        dict(feature=feature, time_cutoff=time_cutoffs[ix])
+                    )
+        self.drift_alerts_count = len(self.drift_alerts)
