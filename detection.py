@@ -2,7 +2,7 @@ from collections import Counter, OrderedDict
 from typing import Union, Tuple, Optional, List, Any
 from datetime import datetime as dt
 
-from scipy.stats import mannwhitneyu, ks_2samp, chisquare
+from scipy.stats import mannwhitneyu, ks_2samp, power_divergence
 import numpy as np
 import pandas as pd
 
@@ -26,7 +26,7 @@ class DistributionDrift:
         """
         Compares two numerical distributions based on the selected test
         """
-        self._validate_test_name(test)
+        self._validate_test_name(test, "numerical")
         test_dict = dict(mw=mannwhitneyu, ks=ks_2samp)
         statistic, p_value = test_dict[test](baseline, new, alternative="two-sided")
         return p_value < self._significance
@@ -35,20 +35,33 @@ class DistributionDrift:
         self,
         baseline: Union[list, np.ndarray, pd.Series],
         new: Union[list, np.ndarray, pd.Series],
+        test: Optional[str] = "pearson",
     ) -> bool:
         """
         Compares two categorical distributions based on the chi-squared test
         """
+        self._validate_test_name(test, "categorical")
         baseline = [cat for cat in baseline if cat in new]
         new = [cat for cat in new if cat in baseline]
         base_freq, new_freq = self._create_frequency_arrays(baseline, new)
-        statistic, p_value = chisquare(new_freq, base_freq)
+        statistic, p_value = power_divergence(new_freq, base_freq, lambda_=test)
         return p_value < self._significance
 
     @staticmethod
-    def _validate_test_name(test: str):
-        if test not in ["mw", "ks"]:
-            raise ValueError("Not a valid test name")
+    def _validate_test_name(test: str, variable_type: str):
+        if variable_type == "numerical":
+            if test not in ["mw", "ks"]:
+                raise ValueError("Not a valid test name")
+        elif variable_type == "categorical":
+            if test not in [
+                "pearson",
+                "log-likelihood",
+                "freeman-tukey",
+                "mod-log-likelihood",
+                "neyman",
+                "cressie-read",
+            ]:
+                raise ValueError("Not a valid test name")
 
     @staticmethod
     def _test_new_categories(
