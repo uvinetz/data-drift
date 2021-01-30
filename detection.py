@@ -80,7 +80,7 @@ class DistributionDrift:
             {key: Counter(new)[key] for key in base_cat_freq.keys()}
         )
 
-        base_cat_freq, new_cat_freq = self._remove_missing_values(baseline, new, base_cat_freq, new_cat_freq)
+        self._check_missing_values_proportions(baseline, new)
 
         base_freq = list(base_cat_freq.values())
         new_freq = list(new_cat_freq.values())
@@ -131,19 +131,15 @@ class DistributionDrift:
                         f"Drift detected in feature {feature} before and after {time_cutoffs[ix]}"
                     )
 
-    def _remove_missing_values(
+    def _check_missing_values_proportions(
         self,
         baseline: Union[list, np.ndarray, pd.Series],
-        new: Union[list, np.ndarray, pd.Series],
-        base_cat_freq: OrderedDict,
-        new_cat_freq: OrderedDict
-    ) -> Tuple[OrderedDict, OrderedDict]:
+        new: Union[list, np.ndarray, pd.Series]
+    ):
         """
         This method gets the missing values frequencies from the original arrays and compares missing values frequencies
         :param baseline: Baseline (old period / train set) vector
         :param new: Target (future period / test set) vector
-        :param base_cat_freq: Baseline vector value counts with missing values
-        :param new_cat_freq: Target vector value counts with missing values
         """
         # Transform inputs into pandas series
         baseline = pd.Series(baseline)
@@ -154,17 +150,9 @@ class DistributionDrift:
         new_missing_prop = new.isna().mean()
 
         # Validate missing values proportions
-        if base_missing_prop != 0 and new_missing_prop != 0 and \
-                (new_missing_prop > base_missing_prop * (1 + self._significance) or
-                 base_missing_prop > new_missing_prop * (1 + self._significance)):
-            raise ValueError("Too many missing values")
-        elif base_missing_prop == 0 and new_missing_prop > self._significance:
-            raise ValueError("Too many missing values")
-        elif new_missing_prop == 0 and base_missing_prop > self._significance:
-            raise ValueError("Too many missing values")
-
-        # Remove the missing values
-        base_cat_freq = OrderedDict({key: value for key, value in base_cat_freq.items() if key})
-        new_cat_freq = OrderedDict({key: value for key, value in new_cat_freq.items() if key})
-
-        return base_cat_freq, new_cat_freq
+        if (base_missing_prop != 0 and new_missing_prop != 0 and
+            (new_missing_prop > base_missing_prop * (1 + self._significance) or
+             base_missing_prop > new_missing_prop * (1 + self._significance))) \
+           or (base_missing_prop == 0 and new_missing_prop > self._significance) \
+           or (new_missing_prop == 0 and base_missing_prop > self._significance):
+            print(f"Drift detected in missing values proportions")
